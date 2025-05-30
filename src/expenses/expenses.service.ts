@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class ExpensesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async create(createExpenseDto: CreateExpenseDto) {
     return this.prisma.expense.create({
@@ -16,25 +21,36 @@ export class ExpensesService {
     });
   }
 
-  async findAll(month?: number, year?: number) {
-    const where: any = {};
+  async findAll(month?: number, year?: number, category?: string) {
+    const cacheKey = `expenses:${month || 'all'}:${year || 'all'}:${
+      category || 'all'
+    }`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
+    const where: any = {};
     if (month && year) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
-
       where.date = {
         gte: startDate,
         lte: endDate,
       };
     }
+    if (category) {
+      where.category = category;
+    }
 
-    return this.prisma.expense.findMany({
+    const expenses = await this.prisma.expense.findMany({
       where,
       orderBy: {
         date: 'desc',
       },
     });
+    await this.cacheManager.set(cacheKey, expenses, 60); // cache for 60 seconds
+    return expenses;
   }
 
   async findOne(id: string) {

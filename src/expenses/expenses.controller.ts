@@ -32,9 +32,14 @@ export class ExpensesController {
   @ApiOperation({ summary: 'Get all expenses' })
   @ApiQuery({ name: 'month', required: false, type: Number })
   @ApiQuery({ name: 'year', required: false, type: Number })
+  @ApiQuery({ name: 'category', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Return all expenses.' })
-  findAll(@Query('month') month?: number, @Query('year') year?: number) {
-    return this.expensesService.findAll(month, year);
+  findAll(
+    @Query('month') month?: number,
+    @Query('year') year?: number,
+    @Query('category') category?: string,
+  ) {
+    return this.expensesService.findAll(month, year, category);
   }
 
   @Get(':id')
